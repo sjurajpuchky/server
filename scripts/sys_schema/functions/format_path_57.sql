@@ -82,7 +82,7 @@ BEGIN
   END IF;
 
   -- @@global.innodb_undo_directory is only set when separate undo logs are used
-  SET v_undo_dir = IFNULL((SELECT VARIABLE_VALUE FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'innodb_undo_directory'), '');
+  SET v_undo_dir = IFNULL((SELECT VARIABLE_VALUE FROM information_schema.global_variables WHERE VARIABLE_NAME = 'innodb_undo_directory'), '');
 
   IF v_path IS NULL THEN
     RETURN NULL;
