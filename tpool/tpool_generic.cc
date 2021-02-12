@@ -278,7 +278,7 @@ public:
 #ifdef _WIN32
     return create_win_aio(this, max_io);
 #elif defined(__linux__)
-    return create_linux_aio(this,max_io);
+    return create_linux_aio(this, max_io);
 #else
     return nullptr;
 #endif
