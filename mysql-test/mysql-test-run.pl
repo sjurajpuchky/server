@@ -3090,6 +3090,9 @@ sub mysql_install_db {
       mtr_appendfile_to_file("$sql_dir/fill_help_tables.sql",
            $bootstrap_sql_file);
 
+      # Append sys schema
+      mtr_appendfile_to_file("$sql_dir/mysql_sys_schema.sql",
+           $bootstrap_sql_file);
       # Create test database
       mtr_appendfile_to_file("$sql_dir/mysql_test_db.sql",
                             $bootstrap_sql_file);

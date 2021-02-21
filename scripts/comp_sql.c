@@ -36,7 +36,7 @@
   - do not duplicate the code either.
  so just add the sql_bootstrap.cc code as is.
 */
-#include "../sql/sql_bootstrap.cc"
+#include "../sql/sql_bootstrap.h"
 
 FILE *in, *out;
 
@@ -121,9 +121,10 @@ static void print_query(FILE *out, const char *query)
   fprintf(out, "\\n\",\n");
 }
 
+static char query[MAX_BOOTSTRAP_QUERY_SIZE];
+
 int main(int argc, char *argv[])
 {
-  char query[MAX_BOOTSTRAP_QUERY_SIZE];
   char* struct_name= argv[1];
   char* infile_name= argv[2];
   char* outfile_name= argv[3];
@@ -131,6 +132,9 @@ int main(int argc, char *argv[])
   int query_length;
   int error= 0;
   char *err_ptr;
+
+  if (!query)
+    die("Can't allocate %u bytes of memory to hold query", (unsigned)MAX_BOOTSTRAP_QUERY_SIZE);
 
   if (argc != 4)
     die("Usage: comp_sql <struct_name> <sql_filename> <c_filename>");
@@ -151,7 +155,7 @@ int main(int argc, char *argv[])
   for ( ; ; )
   {
     rc= read_bootstrap_query(query, &query_length,
-                             (fgets_input_t) in, fgets_fn, &error);
+                             (fgets_input_t) in, fgets_fn, 1, &error);
 
     if (rc == READ_BOOTSTRAP_EOF)
       break;
@@ -186,7 +190,6 @@ int main(int argc, char *argv[])
 
   fclose(in);
   fclose(out);
-
   exit(0);
 
 }

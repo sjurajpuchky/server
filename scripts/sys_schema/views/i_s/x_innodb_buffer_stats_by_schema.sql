@@ -29,6 +29,11 @@
 -- +--------------------------+-----------+--------+-------+--------------+-----------+-------------+
 --
 
+DELIMITER $$
+BEGIN NOT ATOMIC
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+  END;
 CREATE OR REPLACE
   ALGORITHM = TEMPTABLE
   DEFINER = 'root'@'localhost'
@@ -53,3 +58,5 @@ SELECT IF(LOCATE('.', ibp.table_name) = 0, 'InnoDB System', REPLACE(SUBSTRING_IN
  WHERE table_name IS NOT NULL
  GROUP BY object_schema
  ORDER BY SUM(IF(ibp.compressed_size = 0, 16384, compressed_size)) DESC;
+END$$
+DELIMITER ;

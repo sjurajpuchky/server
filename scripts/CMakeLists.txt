@@ -30,7 +30,7 @@ ENDMACRO()
 
 IF(NOT CMAKE_CROSSCOMPILING)
  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
- ADD_EXECUTABLE(comp_sql comp_sql.c)
+ ADD_EXECUTABLE(comp_sql comp_sql.c ../sql/sql_bootstrap.cc)
  TARGET_LINK_LIBRARIES(comp_sql)
 ENDIF()
 
@@ -43,7 +43,7 @@ ENDIF()
 IF(CAT_EXECUTABLE)
   SET(CAT_COMMAND COMMAND
     ${CMAKE_COMMAND} -E chdir  ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CAT_EXECUTABLE} mysql_system_tables_fix.sql mysql_system_tables.sql mysql_performance_tables.sql >
+    ${CAT_EXECUTABLE} mysql_system_tables_fix.sql mysql_system_tables.sql mysql_performance_tables.sql mysql_sys_schema.sql>
     ${CMAKE_CURRENT_BINARY_DIR}/mysql_fix_privilege_tables.sql
   )
 ELSEIF(WIN32)
@@ -51,7 +51,7 @@ ELSEIF(WIN32)
    native_outfile )
   SET(CAT_COMMAND
    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}
-   cmd /c copy /b mysql_system_tables_fix.sql + mysql_system_tables.sql +  mysql_performance_tables.sql
+   cmd /c copy /b mysql_system_tables_fix.sql + mysql_system_tables.sql +  mysql_performance_tables.sql + mysql_sys_schema.sql
    ${native_outfile} )
 ELSE()
   MESSAGE(FATAL_ERROR "Cannot concatenate files")
@@ -70,6 +70,7 @@ ADD_CUSTOM_COMMAND(
   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_fix.sql
   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_performance_tables.sql
+  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
 )
 
 # Add target for the above to be built
@@ -114,6 +115,7 @@ INSTALL(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_to_mariadb.sql
   ${CMAKE_CURRENT_BINARY_DIR}/maria_add_gis_sp.sql
   ${CMAKE_CURRENT_BINARY_DIR}/maria_add_gis_sp_bootstrap.sql
+  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
   ${FIX_PRIVILEGES_SQL}
   DESTINATION ${INSTALL_MYSQLSHAREDIR} COMPONENT Server
 )
