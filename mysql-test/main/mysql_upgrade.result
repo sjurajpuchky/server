@@ -40,6 +40,8 @@ sys.host_summary_by_file_io_type                   OK
 sys.host_summary_by_stages                         OK
 sys.host_summary_by_statement_latency              OK
 sys.host_summary_by_statement_type                 OK
+sys.innodb_buffer_stats_by_schema                  OK
+sys.innodb_buffer_stats_by_table                   OK
 sys.io_by_thread_by_latency                        OK
 sys.io_global_by_file_by_bytes                     OK
 sys.io_global_by_file_by_latency                   OK
@@ -51,6 +53,7 @@ sys.memory_by_thread_by_current_bytes              OK
 sys.memory_by_user_by_current_bytes                OK
 sys.memory_global_by_current_bytes                 OK
 sys.memory_global_total                            OK
+sys.metrics                                        OK
 sys.processlist                                    OK
 sys.ps_check_lost_instrumentation                  OK
 sys.schema_auto_increment_columns                  OK
@@ -59,6 +62,7 @@ sys.schema_object_overview                         OK
 sys.schema_redundant_indexes                       OK
 sys.schema_table_lock_waits                        OK
 sys.schema_table_statistics                        OK
+sys.schema_table_statistics_with_buffer            OK
 sys.schema_tables_with_full_table_scans            OK
 sys.schema_unused_indexes                          OK
 sys.session                                        OK
@@ -87,6 +91,8 @@ sys.x$host_summary_by_file_io_type                 OK
 sys.x$host_summary_by_stages                       OK
 sys.x$host_summary_by_statement_latency            OK
 sys.x$host_summary_by_statement_type               OK
+sys.x$innodb_buffer_stats_by_schema                OK
+sys.x$innodb_buffer_stats_by_table                 OK
 sys.x$io_by_thread_by_latency                      OK
 sys.x$io_global_by_file_by_bytes                   OK
 sys.x$io_global_by_file_by_latency                 OK
@@ -106,6 +112,7 @@ sys.x$schema_flattened_keys                        OK
 sys.x$schema_index_statistics                      OK
 sys.x$schema_table_lock_waits                      OK
 sys.x$schema_table_statistics                      OK
+sys.x$schema_table_statistics_with_buffer          OK
 sys.x$schema_tables_with_full_table_scans          OK
 sys.x$session                                      OK
 sys.x$statement_analysis                           OK
