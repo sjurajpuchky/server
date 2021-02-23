@@ -888,6 +888,8 @@ information_schema	TRIGGERS	ACTION_CONDITION
 information_schema	TRIGGERS	ACTION_STATEMENT
 information_schema	VIEWS	VIEW_DEFINITION
 mysql	global_priv	Priv
+sys	innodb_lock_waits	waiting_query
+sys	innodb_lock_waits	blocking_query
 sys	processlist	current_statement
 sys	processlist	last_statement
 sys	schema_auto_increment_columns	column_type
@@ -947,6 +949,9 @@ event	execute_at	datetime
 event	last_executed	datetime
 event	starts	datetime
 event	ends	datetime
+x$innodb_lock_waits	wait_started	datetime
+x$innodb_lock_waits	waiting_trx_started	datetime
+x$innodb_lock_waits	blocking_trx_started	datetime
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES A
 WHERE NOT EXISTS
 (SELECT * FROM INFORMATION_SCHEMA.COLUMNS B
@@ -1456,6 +1461,7 @@ host_summary_by_statement_latency	NO
 host_summary_by_statement_type	YES
 innodb_buffer_stats_by_schema	NO
 innodb_buffer_stats_by_table	NO
+innodb_lock_waits	NO
 io_by_thread_by_latency	NO
 io_global_by_file_by_bytes	YES
 io_global_by_file_by_latency	YES
@@ -1510,6 +1516,7 @@ x$host_summary_by_statement_latency	NO
 x$host_summary_by_statement_type	YES
 x$innodb_buffer_stats_by_schema	NO
 x$innodb_buffer_stats_by_table	NO
+x$innodb_lock_waits	NO
 x$io_by_thread_by_latency	NO
 x$io_global_by_file_by_bytes	YES
 x$io_global_by_file_by_latency	YES

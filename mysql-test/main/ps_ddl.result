@@ -781,6 +781,7 @@ host_summary_by_statement_latency
 host_summary_by_statement_type
 innodb_buffer_stats_by_schema
 innodb_buffer_stats_by_table
+innodb_lock_waits
 io_by_thread_by_latency
 io_global_by_file_by_bytes
 io_global_by_file_by_latency
@@ -834,6 +835,7 @@ x$host_summary_by_statement_latency
 x$host_summary_by_statement_type
 x$innodb_buffer_stats_by_schema
 x$innodb_buffer_stats_by_table
+x$innodb_lock_waits
 x$io_by_thread_by_latency
 x$io_global_by_file_by_bytes
 x$io_global_by_file_by_latency
@@ -887,6 +889,7 @@ host_summary_by_statement_latency
 host_summary_by_statement_type
 innodb_buffer_stats_by_schema
 innodb_buffer_stats_by_table
+innodb_lock_waits
 io_by_thread_by_latency
 io_global_by_file_by_bytes
 io_global_by_file_by_latency
@@ -940,6 +943,7 @@ x$host_summary_by_statement_latency
 x$host_summary_by_statement_type
 x$innodb_buffer_stats_by_schema
 x$innodb_buffer_stats_by_table
+x$innodb_lock_waits
 x$io_by_thread_by_latency
 x$io_global_by_file_by_bytes
 x$io_global_by_file_by_latency

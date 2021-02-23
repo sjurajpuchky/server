@@ -58,6 +58,7 @@ sys.host_summary_by_statement_latency              OK
 sys.host_summary_by_statement_type                 OK
 sys.innodb_buffer_stats_by_schema                  OK
 sys.innodb_buffer_stats_by_table                   OK
+sys.innodb_lock_waits                              OK
 sys.io_by_thread_by_latency                        OK
 sys.io_global_by_file_by_bytes                     OK
 sys.io_global_by_file_by_latency                   OK
@@ -109,6 +110,7 @@ sys.x$host_summary_by_statement_latency            OK
 sys.x$host_summary_by_statement_type               OK
 sys.x$innodb_buffer_stats_by_schema                OK
 sys.x$innodb_buffer_stats_by_table                 OK
+sys.x$innodb_lock_waits                            OK
 sys.x$io_by_thread_by_latency                      OK
 sys.x$io_global_by_file_by_bytes                   OK
 sys.x$io_global_by_file_by_latency                 OK
