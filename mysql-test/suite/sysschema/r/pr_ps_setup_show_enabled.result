@@ -208,7 +208,7 @@ innodb/page_cleaner_thread	BACKGROUND
 mysys/statement_timer	BACKGROUND
 root@localhost	FOREGROUND
 sql/main	BACKGROUND
-sql/slave_background	BACKGROUND
+sql/manager	BACKGROUND
 CALL sys.ps_setup_show_enabled(TRUE, TRUE);
 performance_schema_enabled
 1
@@ -239,7 +239,7 @@ innodb/page_cleaner_thread	BACKGROUND
 mysys/statement_timer	BACKGROUND
 root@localhost	FOREGROUND
 sql/main	BACKGROUND
-sql/slave_background	BACKGROUND
+sql/manager	BACKGROUND
 enabled_instruments	timed
 idle	YES
 memory/performance_schema/accounts	NO
