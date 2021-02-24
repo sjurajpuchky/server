@@ -1475,7 +1475,7 @@ memory_global_by_current_bytes	YES
 memory_global_total	NO
 metrics	NO
 processlist	NO
-ps_check_lost_instrumentation	NO
+ps_check_lost_instrumentation	YES
 schema_auto_increment_columns	NO
 schema_index_statistics	YES
 schema_object_overview	NO
