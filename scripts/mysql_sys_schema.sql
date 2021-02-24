@@ -16,7 +16,7 @@
 SET NAMES utf8;
 SET @sql_log_bin = @@sql_log_bin;
 SET sql_log_bin = 0;
-SET @sys.ignore_sys_config_triggers = true;
+
 CREATE DATABASE IF NOT EXISTS sys DEFAULT CHARACTER SET utf8;
 
 USE sys;
@@ -108,7 +108,8 @@ INSERT IGNORE INTO sys.sys_config (variable, value) VALUES
     ('statement_performance_analyzer.limit', 100),
     ('statement_performance_analyzer.view', NULL),
     ('diagnostics.allow_i_s_tables', 'OFF'),
-    ('diagnostics.include_raw', 'OFF');
+    ('diagnostics.include_raw', 'OFF'),
+    ('ps_thread_trx_info.max_length', 65535);
 
 -- Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
 --
@@ -132,9 +133,11 @@ INSERT IGNORE INTO sys.sys_config (variable, value) VALUES
 --
 --
 
+DROP TRIGGER IF EXISTS sys_config_insert_set_user;
+
 DELIMITER $$
 
-CREATE  OR REPLACE DEFINER='root'@'localhost' TRIGGER sys_config_insert_set_user BEFORE INSERT on sys_config
+CREATE DEFINER='root'@'localhost' TRIGGER sys_config_insert_set_user BEFORE INSERT on sys_config
     FOR EACH ROW
 BEGIN
     IF @sys.ignore_sys_config_triggers != true AND NEW.set_by IS NULL THEN
@@ -167,9 +170,11 @@ DELIMITER ;
 --
 
 
+DROP TRIGGER IF EXISTS sys_config_update_set_user;
+
 DELIMITER $$
 
-CREATE OR REPLACE DEFINER='root'@'localhost' TRIGGER sys_config_update_set_user BEFORE UPDATE on sys_config
+CREATE DEFINER='root'@'localhost' TRIGGER sys_config_update_set_user BEFORE UPDATE on sys_config
     FOR EACH ROW
 BEGIN
     IF @sys.ignore_sys_config_triggers != true AND NEW.set_by IS NULL THEN
@@ -194,10 +199,11 @@ DELIMITER ;
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+DROP FUNCTION IF EXISTS extract_schema_from_file_name;
 
 DELIMITER $$
 
-CREATE OR REPLACE DEFINER='root'@'localhost' FUNCTION extract_schema_from_file_name (
+CREATE DEFINER='root'@'localhost' FUNCTION extract_schema_from_file_name (
         path VARCHAR(512)
     )
     RETURNS VARCHAR(64) 
@@ -260,10 +266,11 @@ DELIMITER ;
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+DROP FUNCTION IF EXISTS extract_table_from_file_name;
 
 DELIMITER $$
 
-CREATE OR REPLACE DEFINER='root'@'localhost' FUNCTION extract_table_from_file_name (
+CREATE DEFINER='root'@'localhost' FUNCTION extract_table_from_file_name (
         path VARCHAR(512)
     )
     RETURNS VARCHAR(64) 
@@ -322,9 +329,11 @@ DELIMITER ;
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+DROP FUNCTION IF EXISTS format_bytes;
+
 DELIMITER $$
 
-CREATE OR REPLACE DEFINER='root'@'localhost' FUNCTION format_bytes (
+CREATE DEFINER='root'@'localhost' FUNCTION format_bytes (
         -- We feed in and return TEXT here, as aggregates of
         -- bytes can return numbers larger than BIGINT UNSIGNED
         bytes TEXT
@@ -1431,10 +1440,12 @@ BEGIN
 
     DECLARE json_objects LONGTEXT;
 
+    /*!50602
     -- Do not track the current thread, it will kill the stack
     UPDATE performance_schema.threads
        SET instrumented = 'NO'
      WHERE processlist_id = CONNECTION_ID();
+    */
 
     SET SESSION group_concat_max_len=@@global.max_allowed_packet;
 
@@ -1477,6 +1488,7 @@ BEGIN
           ORDER BY event_id ASC SEPARATOR ',') event
     INTO json_objects
     FROM (
+          /*!50600
           -- Select all statements, with the extra tracing information available
           (SELECT thread_id, event_id, event_name, timer_wait, timer_start, nesting_event_id, 
                   CONCAT(sql_text, '\\n',
@@ -1505,7 +1517,7 @@ BEGIN
           -- Select all stages
           (SELECT thread_id, event_id, event_name, timer_wait, timer_start, nesting_event_id, null AS wait_info
              FROM performance_schema.events_stages_history_long WHERE thread_id = thd_id) 
-          UNION
+          UNION */
           -- Select all events, adding information appropriate to the event
           (SELECT thread_id, event_id, 
                   CONCAT(event_name , 
@@ -1519,7 +1531,7 @@ BEGIN
                                 CONCAT(IF (object_name LIKE ':0%', @@socket, object_name)),
                                 object_name),
                             ''),
-                          IF(index_name IS NOT NULL, CONCAT(' Index: ', index_name), ''),'\\n'
+                         /*!50600 IF(index_name IS NOT NULL, CONCAT(' Index: ', index_name), ''),*/'\\n'
                          ) AS event_name,
                   timer_wait, timer_start, nesting_event_id, source AS wait_info
              FROM performance_schema.events_waits_history_long WHERE thread_id = thd_id)) events 
@@ -2064,10 +2076,11 @@ DELIMITER ;
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+DROP FUNCTION IF EXISTS version_patch;
 
 DELIMITER $$
 
-CREATE OR REPLACE DEFINER='root'@'localhost' FUNCTION version_patch ()
+CREATE DEFINER='root'@'localhost' FUNCTION version_patch ()
     RETURNS TINYINT UNSIGNED
     COMMENT '
              Description
@@ -2914,7 +2927,7 @@ VIEW ps_check_lost_instrumentation (
 )
 AS
 SELECT variable_name, variable_value
-  FROM information_schema.global_status
+  FROM performance_schema.global_status
  WHERE variable_name LIKE 'perf%lost'
    AND variable_value > 0;
 
@@ -6903,16 +6916,17 @@ SELECT IF(user IS NULL, 'background', user) AS user,
 --
 -- View: user_summary
 --
--- Summarizes statement activity, file IO and connections by user.
+-- Summarizes statement activity and connections by user
 -- 
 -- When the user found is NULL, it is assumed to be a "background" thread.  
 --
 -- mysql> select * from user_summary;
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | user | statements | statement_latency | statement_avg_latency | table_scans | file_ios | file_io_latency | current_connections | total_connections | unique_hosts |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | root |       2924 | 00:03:59.53       | 81.92 ms              |          82 |    54702 | 55.61 s         |                   1 |                 1 |            1 |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | user | statements | total_latency | avg_latency | current_connections | total_connections | unique_hosts | current_memory | total_memory_allocated |
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | root |       5663 | 00:01:47.14   | 18.92 ms    |                   1 |                 1 |            1 | 1.41 MiB       | 543.55 MiB             |
+-- | mark |        225 | 14.49 s       | 64.40 ms    |                   1 |                 1 |            1 | 707.60 KiB     | 81.02 MiB              |
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
 --
 
 CREATE OR REPLACE
@@ -6929,7 +6943,9 @@ VIEW user_summary (
   file_io_latency,
   current_connections,
   total_connections,
-  unique_hosts
+  unique_hosts,
+  current_memory,
+  total_memory_allocated
 ) AS
 SELECT IF(accounts.user IS NULL, 'background', accounts.user) AS user,
        SUM(stmt.total) AS statements,
@@ -6940,11 +6956,15 @@ SELECT IF(accounts.user IS NULL, 'background', accounts.user) AS user,
        sys.format_time(SUM(io.io_latency)) AS file_io_latency,
        SUM(accounts.current_connections) AS current_connections,
        SUM(accounts.total_connections) AS total_connections,
-       COUNT(DISTINCT host) AS unique_hosts
+       COUNT(DISTINCT host) AS unique_hosts,
+       sys.format_bytes(SUM(mem.current_allocated)) AS current_memory,
+       sys.format_bytes(SUM(mem.total_allocated)) AS total_memory_allocated
   FROM performance_schema.accounts
   LEFT JOIN sys.x$user_summary_by_statement_latency AS stmt ON IF(accounts.user IS NULL, 'background', accounts.user) = stmt.user
   LEFT JOIN sys.x$user_summary_by_file_io AS io ON IF(accounts.user IS NULL, 'background', accounts.user) = io.user
- GROUP BY IF(accounts.user IS NULL, 'background', accounts.user);
+  LEFT JOIN sys.x$memory_by_user_by_current_bytes mem ON IF(accounts.user IS NULL, 'background', accounts.user) = mem.user
+ GROUP BY IF(accounts.user IS NULL, 'background', accounts.user)
+ ORDER BY SUM(stmt.total_latency) DESC;
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 --
@@ -6964,16 +6984,17 @@ SELECT IF(accounts.user IS NULL, 'background', accounts.user) AS user,
 --
 -- View: x$user_summary
 --
--- Summarizes statement activity, file IO and connections by user.
+-- Summarizes statement activity and connections by user
 -- 
 -- When the user found is NULL, it is assumed to be a "background" thread.  
 --
 -- mysql> select * from x$user_summary;
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | user | statements | statement_latency | statement_avg_latency | table_scans | file_ios | file_io_latency | current_connections | total_connections | unique_hosts |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | root |       2925 |   239577283481000 |      81906763583.2479 |          83 |    54709 |  55605611965150 |                   1 |                 1 |            1 |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | user | statements | total_latency   | avg_latency      | current_connections | total_connections | unique_hosts | current_memory | total_memory_allocated |
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | root |       5685 | 107175100271000 | 18852260381.8821 |                   1 |                 1 |            1 |        1459022 |              572855680 |
+-- | mark |        225 |  14489223428000 | 64396548568.8889 |                   1 |                 1 |            1 |         724578 |               84958286 |
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
 --
 
 CREATE OR REPLACE
@@ -6990,7 +7011,9 @@ VIEW x$user_summary (
   file_io_latency,
   current_connections,
   total_connections,
-  unique_hosts
+  unique_hosts,
+  current_memory,
+  total_memory_allocated
 ) AS
 SELECT IF(accounts.user IS NULL, 'background', accounts.user) AS user,
        SUM(stmt.total) AS statements,
@@ -7001,11 +7024,15 @@ SELECT IF(accounts.user IS NULL, 'background', accounts.user) AS user,
        SUM(io.io_latency) AS file_io_latency,
        SUM(accounts.current_connections) AS current_connections,
        SUM(accounts.total_connections) AS total_connections,
-       COUNT(DISTINCT host) AS unique_hosts
+       COUNT(DISTINCT host) AS unique_hosts,
+       SUM(mem.current_allocated) AS current_memory,
+       SUM(mem.total_allocated) AS total_memory_allocated
   FROM performance_schema.accounts
   LEFT JOIN sys.x$user_summary_by_statement_latency AS stmt ON IF(accounts.user IS NULL, 'background', accounts.user) = stmt.user
   LEFT JOIN sys.x$user_summary_by_file_io AS io ON IF(accounts.user IS NULL, 'background', accounts.user) = io.user
- GROUP BY IF(accounts.user IS NULL, 'background', accounts.user);
+  LEFT JOIN sys.x$memory_by_user_by_current_bytes mem ON IF(accounts.user IS NULL, 'background', accounts.user) = mem.user
+ GROUP BY IF(accounts.user IS NULL, 'background', accounts.user)
+ ORDER BY SUM(stmt.total_latency) DESC;
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 --
@@ -7631,16 +7658,17 @@ SELECT IF(host IS NULL, 'background', host) AS host,
 --
 -- View: host_summary
 --
--- Summarizes statement activity, file IO and connections by host.
+-- Summarizes statement activity and connections by host
 --
 -- When the host found is NULL, it is assumed to be a "background" thread.
 --
 -- mysql> select * from host_summary;
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | host | statements | statement_latency | statement_avg_latency | table_scans | file_ios | file_io_latency | current_connections | total_connections | unique_users |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | hal1 |       2924 | 00:03:59.53       | 81.92 ms              |          82 |    54702 | 55.61 s         |                   1 |                 1 |            1 |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | host | statements | total_latency | avg_latency | current_connections | total_connections | unique_users | current_memory | total_memory_allocated |
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | hal1 |       5663 | 00:01:47.14   | 18.92 ms    |                   1 |                 1 |            1 | 1.41 MiB       | 543.55 MiB             |
+-- | hal2 |        225 | 14.49 s       | 64.40 ms    |                   1 |                 1 |            1 | 707.60 KiB     | 81.02 MiB              |
+-- +------+------------+---------------+-------------+---------------------+-------------------+--------------+----------------+------------------------+
 --
 
 CREATE OR REPLACE
@@ -7657,7 +7685,9 @@ VIEW host_summary (
   file_io_latency,
   current_connections,
   total_connections,
-  unique_users
+  unique_users,
+  current_memory,
+  total_memory_allocated
 ) AS
 SELECT IF(accounts.host IS NULL, 'background', accounts.host) AS host,
        SUM(stmt.total) AS statements,
@@ -7668,10 +7698,13 @@ SELECT IF(accounts.host IS NULL, 'background', accounts.host) AS host,
        sys.format_time(SUM(io.io_latency)) AS file_io_latency,
        SUM(accounts.current_connections) AS current_connections,
        SUM(accounts.total_connections) AS total_connections,
-       COUNT(DISTINCT accounts.user) AS unique_users
+       COUNT(DISTINCT user) AS unique_users,
+       sys.format_bytes(SUM(mem.current_allocated)) AS current_memory,
+       sys.format_bytes(SUM(mem.total_allocated)) AS total_memory_allocated
   FROM performance_schema.accounts
-  LEFT JOIN sys.x$host_summary_by_statement_latency AS stmt ON accounts.host = stmt.host
-  LEFT JOIN sys.x$host_summary_by_file_io AS io ON accounts.host = io.host
+  JOIN sys.x$host_summary_by_statement_latency AS stmt ON accounts.host = stmt.host
+  JOIN sys.x$host_summary_by_file_io AS io ON accounts.host = io.host
+  JOIN sys.x$memory_by_host_by_current_bytes mem ON accounts.host = mem.host
  GROUP BY IF(accounts.host IS NULL, 'background', accounts.host);
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
@@ -7692,16 +7725,17 @@ SELECT IF(accounts.host IS NULL, 'background', accounts.host) AS host,
 --
 -- View: x$host_summary
 --
--- Summarizes statement activity, file IO and connections by host.
+-- Summarizes statement activity and connections by host
 --
 -- When the host found is NULL, it is assumed to be a "background" thread.
 --
 -- mysql> select * from x$host_summary;
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | host | statements | statement_latency | statement_avg_latency | table_scans | file_ios | file_io_latency | current_connections | total_connections | unique_users |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
--- | hal  |       2925 |   239577283481000 |      81906763583.2479 |          83 |    54709 |  55605611965150 |                   1 |                 1 |            1 |
--- +------+------------+-------------------+-----------------------+-------------+----------+-----------------+---------------------+-------------------+--------------+
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | host | statements | total_latency   | avg_latency      | current_connections | total_connections | unique_users | current_memory | total_memory_allocated |
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
+-- | hal1 |       5685 | 107175100271000 | 18852260381.8821 |                   1 |                 1 |            1 |        1459022 |              572855680 |
+-- | hal2 |        225 |  14489223428000 | 64396548568.8889 |                   1 |                 1 |            1 |         724578 |               84958286 |
+-- +------+------------+-----------------+------------------+---------------------+-------------------+--------------+----------------+------------------------+
 --
 
 CREATE OR REPLACE
@@ -7718,7 +7752,9 @@ VIEW x$host_summary (
   file_io_latency,
   current_connections,
   total_connections,
-  unique_users
+  unique_users,
+  current_memory,
+  total_memory_allocated
 ) AS
 SELECT IF(accounts.host IS NULL, 'background', accounts.host) AS host,
        SUM(stmt.total) AS statements,
@@ -7729,10 +7765,13 @@ SELECT IF(accounts.host IS NULL, 'background', accounts.host) AS host,
        SUM(io.io_latency) AS file_io_latency,
        SUM(accounts.current_connections) AS current_connections,
        SUM(accounts.total_connections) AS total_connections,
-       COUNT(DISTINCT accounts.user) AS unique_users
+       COUNT(DISTINCT accounts.user) AS unique_users,
+       SUM(mem.current_allocated) AS current_memory,
+       SUM(mem.total_allocated) AS total_memory_allocated
   FROM performance_schema.accounts
-  LEFT JOIN sys.x$host_summary_by_statement_latency AS stmt ON accounts.host = stmt.host
-  LEFT JOIN sys.x$host_summary_by_file_io AS io ON accounts.host = io.host
+  JOIN sys.x$host_summary_by_statement_latency AS stmt ON accounts.host = stmt.host
+  JOIN sys.x$host_summary_by_file_io AS io ON accounts.host = io.host
+  JOIN sys.x$memory_by_host_by_current_bytes mem ON accounts.host = mem.host
  GROUP BY IF(accounts.host IS NULL, 'background', accounts.host);
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
@@ -8458,30 +8497,39 @@ DELIMITER ;
 --
 -- A detailed non-blocking processlist view to replace 
 -- [INFORMATION_SCHEMA. | SHOW FULL] PROCESSLIST
+-- 
+-- Performs less locking than the legacy sources, whilst giving extra information.
 --
--- mysql> select * from processlist where conn_id is not null\G
+-- mysql> select * from sys.processlist where conn_id is not null and command != 'daemon' and conn_id != connection_id()\G
 -- *************************** 1. row ***************************
---                 thd_id: 23
---                conn_id: 4
+--                 thd_id: 44524
+--                conn_id: 44502
 --                   user: msandbox@localhost
 --                     db: test
 --                command: Query
---                  state: Sending data
---                   time: 4
---      current_statement: select count(*) from t1
---      statement_latency: 4.56 s
---           lock_latency: 108.00 us
+--                  state: alter table (flush)
+--                   time: 18
+--      current_statement: alter table t1 add column g int
+--      statement_latency: 18.45 s
+--               progress: 98.84
+--           lock_latency: 265.43 ms
 --          rows_examined: 0
 --              rows_sent: 0
 --          rows_affected: 0
 --             tmp_tables: 0
 --        tmp_disk_tables: 0
---              full_scan: YES
+--              full_scan: NO
 --         last_statement: NULL
 -- last_statement_latency: NULL
---              last_wait: wait/io/table/sql/handler
---      last_wait_latency: Still Waiting
---                 source: handler.cc:2688
+--         current_memory: 664.06 KiB
+--              last_wait: wait/io/file/innodb/innodb_data_file
+--      last_wait_latency: 1.07 us
+--                 source: fil0fil.cc:5146
+--            trx_latency: NULL
+--              trx_state: NULL
+--         trx_autocommit: NULL
+--                    pid: 4212
+--           program_name: mysql
 --
 
 CREATE OR REPLACE
@@ -8498,6 +8546,7 @@ VIEW processlist (
   time,
   current_statement,
   statement_latency,
+  progress,
   lock_latency,
   rows_examined,
   rows_sent,
@@ -8507,9 +8556,15 @@ VIEW processlist (
   full_scan,
   last_statement,
   last_statement_latency,
+  current_memory,
   last_wait,
   last_wait_latency,
-  source
+  source,
+  trx_latency,
+  trx_state,
+  trx_autocommit,
+  pid,
+  program_name
 ) AS
 SELECT pps.thread_id AS thd_id,
        pps.processlist_id AS conn_id,
@@ -8524,6 +8579,9 @@ SELECT pps.thread_id AS thd_id,
        IF(esc.end_event_id IS NULL,
           sys.format_time(esc.timer_wait),
           NULL) AS statement_latency,
+       IF(esc.end_event_id IS NULL,
+          ROUND(100 * (estc.work_completed / estc.work_estimated), 2),
+          NULL) AS progress,
        sys.format_time(esc.lock_time) AS lock_latency,
        esc.rows_examined AS rows_examined,
        esc.rows_sent AS rows_sent,
@@ -8537,14 +8595,27 @@ SELECT pps.thread_id AS thd_id,
        IF(esc.end_event_id IS NOT NULL,
           sys.format_time(esc.timer_wait),
           NULL) AS last_statement_latency,
+       sys.format_bytes(mem.current_allocated) AS current_memory,
        ewc.event_name AS last_wait,
        IF(ewc.end_event_id IS NULL AND ewc.event_name IS NOT NULL,
           'Still Waiting',
           sys.format_time(ewc.timer_wait)) last_wait_latency,
-       ewc.source
+       ewc.source,
+       sys.format_time(etc.timer_wait) AS trx_latency,
+       etc.state AS trx_state,
+       etc.autocommit AS trx_autocommit,
+       conattr_pid.attr_value as pid,
+       conattr_progname.attr_value as program_name
   FROM performance_schema.threads AS pps
   LEFT JOIN performance_schema.events_waits_current AS ewc USING (thread_id)
-  LEFT JOIN performance_schema.events_statements_current as esc USING (thread_id)
+  LEFT JOIN performance_schema.events_stages_current AS estc USING (thread_id)
+  LEFT JOIN performance_schema.events_statements_current AS esc USING (thread_id)
+  LEFT JOIN performance_schema.events_transactions_current AS etc USING (thread_id)
+  LEFT JOIN sys.x$memory_by_thread_by_current_bytes AS mem USING (thread_id)
+  LEFT JOIN performance_schema.session_connect_attrs AS conattr_pid
+    ON conattr_pid.processlist_id=pps.processlist_id and conattr_pid.attr_name='_pid'
+  LEFT JOIN performance_schema.session_connect_attrs AS conattr_progname
+    ON conattr_progname.processlist_id=pps.processlist_id and conattr_progname.attr_name='program_name'
  ORDER BY pps.processlist_time DESC, last_wait_latency DESC;
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
@@ -8568,18 +8639,22 @@ SELECT pps.thread_id AS thd_id,
 -- A detailed non-blocking processlist view to replace 
 -- [INFORMATION_SCHEMA. | SHOW FULL] PROCESSLIST
 -- 
--- mysql> select * from x$processlist where conn_id is not null\G
--- *************************** 1. row ***************************
---                 thd_id: 23
---                conn_id: 4
+-- Performs less locking than the legacy sources, whilst giving extra information.
+--
+-- mysql> select * from sys.x$processlist where conn_id is not null and command != 'daemon' and conn_id != connection_id()\G
+-- ...
+-- *************************** 2. row ***************************
+--                 thd_id: 720
+--                conn_id: 698
 --                   user: msandbox@localhost
 --                     db: test
 --                command: Query
---                  state: altering table
---                   time: 19
---      current_statement: alter table t1 add column j int
---      statement_latency: 19466744276374
---           lock_latency: 539307000000
+--                  state: alter table (read PK and internal sort)
+--                   time: 2
+--      current_statement: alter table t1 add column l int
+--      statement_latency: 2349834276374
+--               progress: 60.00
+--           lock_latency: 339707000000
 --          rows_examined: 0
 --              rows_sent: 0
 --          rows_affected: 0
@@ -8588,9 +8663,15 @@ SELECT pps.thread_id AS thd_id,
 --              full_scan: NO
 --         last_statement: NULL
 -- last_statement_latency: NULL
---              last_wait: wait/io/file/innodb/innodb_temp_file
---      last_wait_latency: 63400681890
---                 source: row0merge.cc:780
+--         current_memory: 10186821
+--              last_wait: wait/io/file/innodb/innodb_data_file
+--      last_wait_latency: Still Waiting
+--                 source: fil0fil.cc:5351
+--            trx_latency: NULL
+--              trx_state: NULL
+--         trx_autocommit: NULL
+--                    pid: 5559
+--           program_name: mysql
 --
 
 CREATE OR REPLACE
@@ -8607,6 +8688,7 @@ VIEW x$processlist (
   time,
   current_statement,
   statement_latency,
+  progress,
   lock_latency,
   rows_examined,
   rows_sent,
@@ -8616,9 +8698,15 @@ VIEW x$processlist (
   full_scan,
   last_statement,
   last_statement_latency,
+  current_memory,
   last_wait,
   last_wait_latency,
-  source
+  source,
+  trx_latency,
+  trx_state,
+  trx_autocommit,
+  pid,
+  program_name
 ) AS
 SELECT pps.thread_id AS thd_id,
        pps.processlist_id AS conn_id,
@@ -8633,6 +8721,9 @@ SELECT pps.thread_id AS thd_id,
        IF(esc.end_event_id IS NULL,
           esc.timer_wait,
           NULL) AS statement_latency,
+       IF(esc.end_event_id IS NULL,
+          ROUND(100 * (estc.work_completed / estc.work_estimated), 2),
+          NULL) AS progress,
        esc.lock_time AS lock_latency,
        esc.rows_examined AS rows_examined,
        esc.rows_sent AS rows_sent,
@@ -8646,14 +8737,27 @@ SELECT pps.thread_id AS thd_id,
        IF(esc.end_event_id IS NOT NULL,
           esc.timer_wait,
           NULL) AS last_statement_latency,
+       mem.current_allocated AS current_memory,
        ewc.event_name AS last_wait,
        IF(ewc.end_event_id IS NULL AND ewc.event_name IS NOT NULL,
           'Still Waiting', 
           ewc.timer_wait) last_wait_latency,
-       ewc.source
+       ewc.source,
+       etc.timer_wait AS trx_latency,
+       etc.state AS trx_state,
+       etc.autocommit AS trx_autocommit,
+       conattr_pid.attr_value as pid,
+       conattr_progname.attr_value as program_name
   FROM performance_schema.threads AS pps
   LEFT JOIN performance_schema.events_waits_current AS ewc USING (thread_id)
-  LEFT JOIN performance_schema.events_statements_current as esc USING (thread_id)
+  LEFT JOIN performance_schema.events_stages_current AS estc USING (thread_id)
+  LEFT JOIN performance_schema.events_statements_current AS esc USING (thread_id)
+  LEFT JOIN performance_schema.events_transactions_current AS etc USING (thread_id)
+  LEFT JOIN sys.x$memory_by_thread_by_current_bytes AS mem USING (thread_id)
+  LEFT JOIN performance_schema.session_connect_attrs AS conattr_pid
+    ON conattr_pid.processlist_id=pps.processlist_id and conattr_pid.attr_name='_pid'
+  LEFT JOIN performance_schema.session_connect_attrs AS conattr_progname
+    ON conattr_progname.processlist_id=pps.processlist_id and conattr_progname.attr_name='program_name'
  ORDER BY pps.processlist_time DESC, last_wait_latency DESC;
 
 -- Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
@@ -9393,10 +9497,7 @@ BEGIN
                                    'YES',
                                    'NO'
                                ),
-        v_has_replication    = /*!50707 IF(v_has_ps_replication = 'YES', IF((SELECT COUNT(*) FROM performance_schema.replication_connection_status) > 0, 'YES', 'NO'),*/
-                                  IF(@master_info_repository = 'TABLE', IF((SELECT COUNT(*) FROM mysql.slave_master_info) > 0, 'YES', 'NO'),
-                                     IF(@relay_log_info_repository = 'TABLE', IF((SELECT COUNT(*) FROM mysql.slave_relay_log_info) > 0, 'YES', 'NO'),
-                                        'MAYBE'))/*!50707 )*/,
+        v_has_replication    = 'MAYBE',
         v_has_metrics        = IF(v_has_ps = 'YES' OR (sys.version_major() = 5 AND sys.version_minor() = 6), 'YES', 'NO'),
         v_has_ps_vars        = 'NO';
 
@@ -9662,23 +9763,6 @@ BEGIN
             SELECT 'Replication - Applier Configuration' AS 'The following output is:';
             SELECT * FROM performance_schema.replication_applier_configuration ORDER BY CHANNEL_NAME;
         END IF;
-
-        IF (@master_info_repository = 'TABLE') THEN
-            SELECT 'Replication - Master Info Repository Configuration' AS 'The following output is:';
-            -- Can't just do SELECT *  as the password may be present in plain text
-            -- Don't include binary log file and position as that will be determined in each iteration as well
-            SELECT /*!50706 Channel_name, */Host, User_name, Port, Connect_retry,
-                   Enabled_ssl, Ssl_ca, Ssl_capath, Ssl_cert, Ssl_cipher, Ssl_key, Ssl_verify_server_cert,
-                   Heartbeat, Bind, Ignored_server_ids, Uuid, Retry_count, Ssl_crl, Ssl_crlpath,
-                   Tls_version, Enabled_auto_position
-              FROM mysql.slave_master_info/*!50706 ORDER BY Channel_name*/;
-        END IF;
-
-        IF (@relay_log_info_repository = 'TABLE') THEN
-            SELECT 'Replication - Relay Log Repository Configuration' AS 'The following output is:';
-            SELECT /*!50706 Channel_name, */Sql_delay, Number_of_workers, Id
-              FROM mysql.slave_relay_log_info/*!50706 ORDER BY Channel_name*/;
-        END IF;
     END IF;
 
 
@@ -9782,38 +9866,6 @@ BEGIN
         IF (v_has_replication <> 'NO') THEN
             SELECT 'SHOW SLAVE STATUS' AS 'The following output is:';
             SHOW SLAVE STATUS;
-            
-            IF (v_has_ps_replication = 'YES') THEN
-                SELECT 'Replication Connection Status' AS 'The following output is:';
-                SELECT * FROM performance_schema.replication_connection_status;
-
-                SELECT 'Replication Applier Status' AS 'The following output is:';
-                SELECT * FROM performance_schema.replication_applier_status ORDER BY CHANNEL_NAME;
-                
-                SELECT 'Replication Applier Status - Coordinator' AS 'The following output is:';
-                SELECT * FROM performance_schema.replication_applier_status_by_coordinator ORDER BY CHANNEL_NAME;
-
-                SELECT 'Replication Applier Status - Worker' AS 'The following output is:';
-                SELECT * FROM performance_schema.replication_applier_status_by_worker ORDER BY CHANNEL_NAME, WORKER_ID;
-            END IF;
-
-            IF (@master_info_repository = 'TABLE') THEN
-                SELECT 'Replication - Master Log Status' AS 'The following output is:';
-                SELECT Master_log_name, Master_log_pos FROM mysql.slave_master_info;
-            END IF;
-
-            IF (@relay_log_info_repository = 'TABLE') THEN
-                SELECT 'Replication - Relay Log Status' AS 'The following output is:';
-                SELECT sys.format_path(Relay_log_name) AS Relay_log_name, Relay_log_pos, Master_log_name, Master_log_pos FROM mysql.slave_relay_log_info;
-
-                SELECT 'Replication - Worker Status' AS 'The following output is:';
-                SELECT Id, sys.format_path(Relay_log_name) AS Relay_log_name, Relay_log_pos, Master_log_name, Master_log_pos,
-                       sys.format_path(Checkpoint_relay_log_name) AS Checkpoint_relay_log_name, Checkpoint_relay_log_pos,
-                       Checkpoint_master_log_name, Checkpoint_master_log_pos, Checkpoint_seqno, Checkpoint_group_size,
-                       HEX(Checkpoint_group_bitmap) AS Checkpoint_group_bitmap/*!50706 , Channel_name*/
-                  FROM mysql.slave_worker_info
-              ORDER BY /*!50706 Channel_name, */Id;
-            END IF;
         END IF;
 
         -- We need one table per output as a temporary table cannot be opened twice in the same query, and we need to
@@ -9825,7 +9877,7 @@ BEGIN
         CALL sys.execute_prepared_stmt(CONCAT('CREATE TEMPORARY TABLE ', v_table_name, ' (
   Variable_name VARCHAR(193) NOT NULL,
   Variable_value VARCHAR(1024),
-  Type VARCHAR(225) NOT NULL,
+  Type VARCHAR(100) NOT NULL,
   Enabled ENUM(''YES'', ''NO'', ''PARTIAL'') NOT NULL,
   PRIMARY KEY (Type, Variable_name)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8'));
@@ -9870,7 +9922,7 @@ SELECT ''UNIX_TIMESTAMP()'' AS Variable_name, ROUND(UNIX_TIMESTAMP(NOW(3)), 3) A
 
         -- Prepare the query to retrieve the summary
         CALL sys.execute_prepared_stmt(
-            CONCAT('(SELECT Variable_value INTO @sys.diagnostics.output_time FROM ', v_table_name, ' WHERE Type = ''System Time'' AND Variable_name = ''UNIX_TIMESTAMP()'')')
+            CONCAT('SELECT Variable_value INTO @sys.diagnostics.output_time FROM ', v_table_name, ' WHERE Type = ''System Time'' AND Variable_name = ''UNIX_TIMESTAMP()''')
         );
         SET v_output_time = @sys.diagnostics.output_time;
 
@@ -11879,7 +11931,7 @@ BEGIN
     DEALLOCATE PREPARE reset_stmt;
 
     SET @query = 'INSERT IGNORE INTO performance_schema.setup_actors
-                  VALUES (''%'', ''%'', ''%'')';
+                  VALUES (''%'', ''%'', ''%'', ''YES'', ''YES'')';
 
     IF (in_verbose) THEN
         SELECT CONCAT('Resetting: setup_actors\n', REPLACE(@query, '  ', '')) AS status;
@@ -11902,7 +11954,7 @@ BEGIN
     DEALLOCATE PREPARE reset_stmt;
          
     SET @query = 'UPDATE performance_schema.setup_consumers
-                     SET ENABLED = IF(NAME IN (''events_statements_current'', ''global_instrumentation'', ''thread_instrumentation'', ''statements_digest''), ''YES'', ''NO'')';
+                     SET ENABLED = IF(NAME IN (''events_statements_current'', ''events_transactions_current'', ''global_instrumentation'', ''thread_instrumentation'', ''statements_digest''), ''YES'', ''NO'')';
 
     IF (in_verbose) THEN
         SELECT CONCAT('Resetting: setup_consumers\n', REPLACE(@query, '  ', '')) AS status;
@@ -11914,7 +11966,7 @@ BEGIN
 
     SET @query = 'DELETE
                     FROM performance_schema.setup_objects
-                   WHERE NOT (OBJECT_TYPE = ''TABLE'' AND OBJECT_NAME = ''%''
+                   WHERE NOT (OBJECT_TYPE IN (''EVENT'', ''FUNCTION'', ''PROCEDURE'', ''TABLE'', ''TRIGGER'') AND OBJECT_NAME = ''%'' 
                      AND (OBJECT_SCHEMA = ''mysql''              AND ENABLED = ''NO''  AND TIMED = ''NO'' )
                       OR (OBJECT_SCHEMA = ''performance_schema'' AND ENABLED = ''NO''  AND TIMED = ''NO'' )
                       OR (OBJECT_SCHEMA = ''information_schema'' AND ENABLED = ''NO''  AND TIMED = ''NO'' )
@@ -11929,10 +11981,26 @@ BEGIN
     DEALLOCATE PREPARE reset_stmt;
 
     SET @query = 'INSERT IGNORE INTO performance_schema.setup_objects
-                  VALUES (''TABLE'', ''mysql''             , ''%'', ''NO'' , ''NO'' ),
-                         (''TABLE'', ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
-                         (''TABLE'', ''information_schema'', ''%'', ''NO'' , ''NO'' ),
-                         (''TABLE'', ''%''                 , ''%'', ''YES'', ''YES'')';
+                  VALUES (''EVENT''    , ''mysql''             , ''%'', ''NO'' , ''NO'' ),
+                         (''EVENT''    , ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''EVENT''    , ''information_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''EVENT''    , ''%''                 , ''%'', ''YES'', ''YES''),
+                         (''FUNCTION'' , ''mysql''             , ''%'', ''NO'' , ''NO'' ),
+                         (''FUNCTION'' , ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''FUNCTION'' , ''information_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''FUNCTION'' , ''%''                 , ''%'', ''YES'', ''YES''),
+                         (''PROCEDURE'', ''mysql''             , ''%'', ''NO'' , ''NO'' ),
+                         (''PROCEDURE'', ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''PROCEDURE'', ''information_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''PROCEDURE'', ''%''                 , ''%'', ''YES'', ''YES''),
+                         (''TABLE''    , ''mysql''             , ''%'', ''NO'' , ''NO'' ),
+                         (''TABLE''    , ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''TABLE''    , ''information_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''TABLE''    , ''%''                 , ''%'', ''YES'', ''YES''),
+                         (''TRIGGER''  , ''mysql''             , ''%'', ''NO'' , ''NO'' ),
+                         (''TRIGGER''  , ''performance_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''TRIGGER''  , ''information_schema'', ''%'', ''NO'' , ''NO'' ),
+                         (''TRIGGER''  , ''%''                 , ''%'', ''YES'', ''YES'')';
 
     IF (in_verbose) THEN
         SELECT CONCAT('Resetting: setup_objects\n', REPLACE(@query, '  ', '')) AS status;
@@ -11955,6 +12023,7 @@ BEGIN
 END$$
 
 DELIMITER ;
+
 
 -- Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 --
@@ -12474,7 +12543,7 @@ BEGIN
     -- in the setup_actors table were enabled.
     SELECT CONCAT('\'', user, '\'@\'', host, '\'') AS enabled_users
       FROM performance_schema.setup_actors
-     /*!50706 WHERE enabled = 'YES' */
+      WHERE enabled = 'YES'
      ORDER BY enabled_users;
 
     SELECT object_type,
@@ -12496,7 +12565,7 @@ BEGIN
                   REPLACE(name, 'thread/', '')) AS enabled_threads,
         TYPE AS thread_type
           FROM performance_schema.threads
-         WHERE INSTRUMENTED = 'YES'
+         WHERE INSTRUMENTED = 'YES' AND name <> 'thread/innodb/thread_pool_thread'
          ORDER BY enabled_threads;
     END IF;
 
@@ -13599,4 +13668,5 @@ DELIMITER ;
 
 SET @@sql_log_bin = @sql_log_bin;
 use mysql;
+
 

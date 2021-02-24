@@ -141,6 +141,7 @@ void my_error(uint nr, myf MyFlags, ...)
 void my_printf_error(uint error, const char *format, myf MyFlags, ...)
 {
   va_list args;
+
   char ebuff[ERRMSGSIZE];
   DBUG_ENTER("my_printf_error");
   DBUG_PRINT("my", ("nr: %d  MyFlags: %lu  errno: %d  format: %s",
@@ -168,6 +169,7 @@ void my_printf_error(uint error, const char *format, myf MyFlags, ...)
 
 void my_printv_error(uint error, const char *format, myf MyFlags, va_list ap)
 {
+ 
   char ebuff[ERRMSGSIZE];
   DBUG_ENTER("my_printv_error");
   DBUG_PRINT("my", ("nr: %d  MyFlags: %lu  errno: %d  format: %s",

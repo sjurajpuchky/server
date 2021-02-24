@@ -2,13 +2,13 @@ SET(files
 ./before_setup.sql
 ./views/version.sql
 ./tables/sys_config.sql
-./tables/sys_config_data.sql
+./tables/sys_config_data_57.sql
 ./triggers/sys_config_insert_set_user.sql
 ./triggers/sys_config_update_set_user.sql
 ./functions/extract_schema_from_file_name.sql
 ./functions/extract_table_from_file_name.sql
 ./functions/format_bytes.sql
-./functions/format_path.sql
+./functions/format_path_57.sql
 ./functions/format_statement.sql
 ./functions/format_time.sql
 ./functions/list_add.sql
@@ -37,7 +37,7 @@ SET(files
 ./views/i_s/schema_auto_increment_columns.sql
 ./views/i_s/x_schema_flattened_keys.sql
 ./views/i_s/schema_redundant_indexes.sql
-./views/p_s/ps_check_lost_instrumentation.sql
+./views/p_s/ps_check_lost_instrumentation_57.sql
 ./views/p_s/latest_file_io.sql
 ./views/p_s/x_latest_file_io.sql
 ./views/p_s/io_by_thread_by_latency.sql
@@ -96,8 +96,8 @@ SET(files
 ./views/p_s/x_user_summary_by_statement_latency.sql
 ./views/p_s/user_summary_by_stages.sql
 ./views/p_s/x_user_summary_by_stages.sql
-./views/p_s/user_summary.sql
-./views/p_s/x_user_summary.sql
+./views/p_s/user_summary_57.sql
+./views/p_s/x_user_summary_57.sql
 ./views/p_s/host_summary_by_file_io_type.sql
 ./views/p_s/x_host_summary_by_file_io_type.sql
 ./views/p_s/host_summary_by_file_io.sql
@@ -108,8 +108,8 @@ SET(files
 ./views/p_s/x_host_summary_by_statement_latency.sql
 ./views/p_s/host_summary_by_stages.sql
 ./views/p_s/x_host_summary_by_stages.sql
-./views/p_s/host_summary.sql
-./views/p_s/x_host_summary.sql
+./views/p_s/host_summary_57.sql
+./views/p_s/x_host_summary_57.sql
 ./views/p_s/wait_classes_global_by_avg_latency.sql
 ./views/p_s/x_wait_classes_global_by_avg_latency.sql
 ./views/p_s/wait_classes_global_by_latency.sql
@@ -121,8 +121,8 @@ SET(files
 ./views/p_s/waits_global_by_latency.sql
 ./views/p_s/x_waits_global_by_latency.sql
 ./views/p_s/metrics.sql
-./views/p_s/processlist.sql
-./views/p_s/x_processlist.sql
+./views/p_s/processlist_57.sql
+./views/p_s/x_processlist_57.sql
 ./views/p_s/sessions.sql
 ./views/p_s/x_sessions.sql
 ./views/p_s/session_ssl_status.sql
@@ -142,7 +142,7 @@ SET(files
 ./procedures/ps_setup_enable_thread.sql
 ./procedures/ps_setup_reload_saved.sql
 ./procedures/ps_setup_reset_to_default_before.sql
-./procedures/ps_setup_reset_to_default.sql
+./procedures/ps_setup_reset_to_default_57.sql
 ./procedures/ps_setup_reset_to_default_after.sql
 ./procedures/ps_setup_save.sql
 ./procedures/ps_setup_show_disabled.sql
@@ -157,8 +157,8 @@ SET(files
 ./after_setup.sql
 )
 
-FILE(WRITE  ../mysql_sys_schema.sql.in "")
+FILE(WRITE  ../mysql_sys_schema.sql "")
 FOREACH(f ${files})
   FILE(READ ${f} content)
-  FILE(APPEND ${CMAKE_CURRENT_BINARY_DIR}/mysql_sys_schema.sql.in "${content}\n")
+  FILE(APPEND ../mysql_sys_schema.sql "${content}\n")
 ENDFOREACH()

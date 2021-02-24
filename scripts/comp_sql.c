@@ -133,9 +133,6 @@ int main(int argc, char *argv[])
   int error= 0;
   char *err_ptr;
 
-  if (!query)
-    die("Can't allocate %u bytes of memory to hold query", (unsigned)MAX_BOOTSTRAP_QUERY_SIZE);
-
   if (argc != 4)
     die("Usage: comp_sql <struct_name> <sql_filename> <c_filename>");
 
