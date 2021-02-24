@@ -1,4 +1,5 @@
 -- source include/not_embedded.inc
+-- source include/have_innodb.inc
 
 # Disable a few instruments
 UPDATE performance_schema.setup_instruments

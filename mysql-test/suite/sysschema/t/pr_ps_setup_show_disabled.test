@@ -1,4 +1,5 @@
 -- source include/not_embedded.inc
+-- source include/have_innodb.inc
 
 # Add to users to the setup_actors table: one enabled, and one disabled
 INSERT INTO performance_schema.setup_actors

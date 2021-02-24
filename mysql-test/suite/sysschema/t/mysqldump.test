@@ -1,5 +1,5 @@
 -- source include/not_embedded.inc
-
+-- source include/have_innodb.inc
 # Dump all databases
 --exec $MYSQL_DUMP -uroot --all-databases > $MYSQLTEST_VARDIR/tmp/bug20902791.sql
 
