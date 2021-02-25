@@ -1822,7 +1822,6 @@ end_wait:
       mysql_mutex_lock(&lock_sys.wait_mutex);
       if (lock_t *lock= trx->lock.wait_lock)
       {
-        ut_ad(lock == wait_lock);
         trx->mutex_lock();
         lock_cancel_waiting_and_release(lock);
         trx->mutex_unlock();
