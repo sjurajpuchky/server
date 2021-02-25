@@ -1696,10 +1696,17 @@ dberr_t lock_wait(que_thr_t *thr)
   /* The wait_lock can be cleared by another thread in lock_grant(),
   lock_rec_cancel(), or lock_cancel_waiting_and_release(). But, a wait
   can only be initiated by the current thread which owns the transaction.
-  Even if trx->lock.wait_lock were set to nullptr, the object that used
-  to point to it will remain valid (and granted to this transaction).
-  So, it should be safe to dereference wait_lock, even though we are
-  not holding any mutex here. */
+
+  Even if trx->lock.wait_lock were changed, the object that it used to
+  point to it will remain valid memory (remain allocated from
+  trx->lock.lock_heap). If trx->lock.wait_lock was set to nullptr, the
+  original object could be transformed to a granted lock. On a page
+  split or merge, we would change trx->lock.wait_lock to point to
+  another waiting lock request object, and the old object would be
+  logically discarded.
+
+  In any case, it is safe to dereference the memory area that
+  wait_lock points to, even though we are not holding any mutex. */
   const lock_t *const wait_lock= trx->lock.wait_lock;
 
   if (!wait_lock)
@@ -1742,9 +1749,8 @@ dberr_t lock_wait(que_thr_t *thr)
   dberr_t error_state= DB_SUCCESS;
 
   mysql_mutex_lock(&lock_sys.wait_mutex);
-  if (ut_d(auto wl=) trx->lock.wait_lock)
+  if (trx->lock.wait_lock)
   {
-    ut_ad(wl == wait_lock);
     if (Deadlock::check_and_resolve(trx))
     {
       ut_ad(!trx->lock.wait_lock);
@@ -1765,10 +1771,9 @@ dberr_t lock_wait(que_thr_t *thr)
 
   trx->error_state= DB_SUCCESS;
 
-  while (ut_d(auto wl=) trx->lock.wait_lock)
+  while (trx->lock.wait_lock)
   {
     int err;
-    ut_ad(wl == wait_lock);
 
     if (no_timeout)
     {
@@ -1810,9 +1815,8 @@ end_wait:
   mysql_mutex_unlock(&lock_sys.wait_mutex);
   thd_wait_end(trx->mysql_thd);
 
-  if (ut_d(auto wl=) trx->lock.wait_lock)
+  if (trx->lock.wait_lock)
   {
-    ut_ad(wl == wait_lock);
     {
       LockMutexGuard g{SRW_LOCK_CALL};
       mysql_mutex_lock(&lock_sys.wait_mutex);
